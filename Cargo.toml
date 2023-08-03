@@ -12,3 +12,4 @@ log = "0.4.19"
 wgpu = "0.17.0"
 pollster = "0.3.0"
 bytemuck = { version = "1.12", features = [ "derive" ] }
+anyhow = "1.0.72"
