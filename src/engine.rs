@@ -5,6 +5,8 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
 };
 
+use self::{material::Material, object::EngineObject};
+
 pub struct Engine {
     event_loop: EventLoop<()>,
     instance: wgpu::Instance,
@@ -101,6 +103,11 @@ impl Engine {
             .renderer
             .context("init must be called before beginning the loop")?;
 
+        let mut scene = scene::Scene::new();
+        let obj = EngineObject::new(Material::new(renderer.device(), renderer.config().format));
+
+        scene.issue_key(obj);
+
         self.event_loop
             .run(move |event, _, control_flow| match event {
                 Event::WindowEvent {
@@ -130,7 +137,7 @@ impl Engine {
                 }
                 Event::RedrawRequested(window_id) if window_id == self.window.window().id() => {
                     // TODO: Update method goes here
-                    match renderer.render() {
+                    match renderer.render(&scene) {
                         Ok(_) => {}
                         Err(wgpu::SurfaceError::Lost) => {
                             self.window.resize(renderer.config(), self.window.size());
@@ -145,5 +152,8 @@ impl Engine {
     }
 }
 
+pub mod material;
+pub mod object;
 pub mod renderer;
+pub mod scene;
 pub mod window;

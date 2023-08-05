@@ -1,3 +1,5 @@
+use super::scene;
+
 pub struct Renderer {
     surface: wgpu::Surface,
     device: wgpu::Device,
@@ -22,7 +24,7 @@ impl Renderer {
         }
     }
 
-    pub fn render(&self) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&self, scene: &scene::Scene) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let output_view = output
             .texture
@@ -47,6 +49,10 @@ impl Renderer {
             depth_stencil_attachment: None,
         });
 
+        for (key, _value) in scene.objects() {
+            scene.describe(key, &mut pass)
+        }
+
         drop(pass);
         self.queue.submit(std::iter::once(encoder.finish()));
 
@@ -62,5 +68,9 @@ impl Renderer {
 
     pub fn config(&self) -> wgpu::SurfaceConfiguration {
         self.config.clone()
+    }
+
+    pub fn device(&self) -> &wgpu::Device {
+        &self.device
     }
 }
