@@ -119,24 +119,22 @@ impl From<Quad> for Mesh {
         let extent_x = value.size.x / 2.0;
         let extent_y = value.size.y / 2.0;
 
-        let (u_left, u_right) = (0.0, 1.0);
-
         let vertices = vec![
             Vertex {
                 position: Vec3::new(-extent_x, -extent_y, 0.0),
-                uv: Vec2::new(u_left, 1.0),
+                uv: Vec2::new(0.0, 1.0),
             },
             Vertex {
                 position: Vec3::new(-extent_x, extent_y, 0.0),
-                uv: Vec2::new(u_left, 0.0),
+                uv: Vec2::new(0.0, 0.0),
             },
             Vertex {
                 position: Vec3::new(extent_x, extent_y, 0.0),
-                uv: Vec2::new(u_right, 0.0),
+                uv: Vec2::new(1.0, 0.0),
             },
             Vertex {
                 position: Vec3::new(extent_x, -extent_y, 0.0),
-                uv: Vec2::new(u_right, 1.0),
+                uv: Vec2::new(1.0, 1.0),
             },
         ];
 
@@ -145,6 +143,38 @@ impl From<Quad> for Mesh {
         Self {
             vertices,
             indices: Some(indices),
+        }
+    }
+}
+
+pub struct Tri;
+
+impl Tri {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl From<Tri> for Mesh {
+    fn from(_value: Tri) -> Self {
+        let vertices = vec![
+            Vertex {
+                position: Vec3::new(0.0, 0.5, 0.0),
+                uv: Vec2::new(0.5, 0.0),
+            },
+            Vertex {
+                position: Vec3::new(-0.5, -0.5, 0.0),
+                uv: Vec2::new(0.0, 1.0),
+            },
+            Vertex {
+                position: Vec3::new(0.5, -0.5, 0.0),
+                uv: Vec2::new(1.0, 1.0),
+            },
+        ];
+
+        Self {
+            vertices,
+            indices: None,
         }
     }
 }
