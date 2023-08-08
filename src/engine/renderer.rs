@@ -1,4 +1,4 @@
-use super::scene;
+use super::{mesh::MeshDrawCallBuilder, scene};
 
 pub struct Renderer {
     surface: wgpu::Surface,
@@ -36,6 +36,8 @@ impl Renderer {
                 label: Some("Render encoder"),
             });
 
+        let mut builders: Vec<MeshDrawCallBuilder> = Vec::with_capacity(scene.objects().len());
+
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -50,7 +52,11 @@ impl Renderer {
         });
 
         for (key, _value) in scene.objects() {
-            scene.describe(key, &mut pass)
+            builders.push(scene.describe(key, &self, &mut pass));
+        }
+
+        for call in &builders {
+            Self::parse_draw_call(call, &mut pass);
         }
 
         drop(pass);
@@ -59,6 +65,23 @@ impl Renderer {
         output.present();
 
         Ok(())
+    }
+
+    fn parse_draw_call<'a>(call: &'a MeshDrawCallBuilder, pass: &mut wgpu::RenderPass<'a>) {
+        let (vbuf, lvbuf) = call.v_buf();
+        let oibuf = call.i_buf();
+
+        pass.set_vertex_buffer(0, vbuf.slice(..));
+
+        match oibuf {
+            Some((ibuf, libuf)) => {
+                pass.set_index_buffer(ibuf.slice(..), wgpu::IndexFormat::Uint16);
+                pass.draw_indexed(0..libuf, 0, 0..1);
+            }
+            None => {
+                pass.draw(0..lvbuf, 0..1);
+            }
+        }
     }
 
     pub fn configure(&mut self, new_config: wgpu::SurfaceConfiguration) {

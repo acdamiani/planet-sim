@@ -1,4 +1,6 @@
+use super::mesh::MeshDrawCallBuilder;
 use super::object::{EngineKey, EngineObject};
+use super::renderer;
 use slotmap::HopSlotMap;
 
 pub struct Scene {
@@ -19,11 +21,15 @@ impl Scene {
         self.engine_objects.insert(object)
     }
 
-    pub fn describe<'a>(&'a self, key: EngineKey, pass: &mut wgpu::RenderPass<'a>) {
+    pub fn describe<'a>(
+        &'a self,
+        key: EngineKey,
+        renderer: &renderer::Renderer,
+        pass: &mut wgpu::RenderPass<'a>,
+    ) -> MeshDrawCallBuilder {
         let obj = &self.engine_objects[key];
         pass.set_pipeline(obj.mat().pipeline());
-        // WARN: This is temporary
-        pass.draw(0..3, 0..1);
+        obj.mesh().draw(&renderer)
     }
 
     pub fn objects(&self) -> &HopSlotMap<EngineKey, EngineObject> {

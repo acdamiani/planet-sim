@@ -1,11 +1,10 @@
+use self::{material::Material, mesh::*, object::EngineObject};
 use anyhow::{Context, Result};
 use std::vec;
 use winit::{
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
 };
-
-use self::{material::Material, object::EngineObject};
 
 pub struct Engine {
     event_loop: EventLoop<()>,
@@ -104,7 +103,10 @@ impl Engine {
             .context("init must be called before beginning the loop")?;
 
         let mut scene = scene::Scene::new();
-        let obj = EngineObject::new(Material::new(renderer.device(), renderer.config().format));
+        let obj = EngineObject::new(
+            Mesh::from(Quad::default()),
+            Material::new(renderer.device(), renderer.config().format),
+        );
 
         scene.issue_key(obj);
 
@@ -153,6 +155,7 @@ impl Engine {
 }
 
 pub mod material;
+pub mod mesh;
 pub mod object;
 pub mod renderer;
 pub mod scene;
