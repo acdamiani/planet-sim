@@ -104,7 +104,7 @@ impl Engine {
 
         let mut scene = scene::Scene::new();
         let obj = EngineObject::new(
-            Mesh::from(Tri::new()),
+            Mesh::from(Quad::default()),
             Material::new(renderer.device(), renderer.config().format),
         );
 

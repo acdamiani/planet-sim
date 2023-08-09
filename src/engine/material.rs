@@ -8,7 +8,7 @@ pub struct Material {
 impl Material {
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         let shader =
-            device.create_shader_module(wgpu::include_wgsl!("../../assets/shaders/default.wgsl"));
+            device.create_shader_module(wgpu::include_wgsl!("../../assets/shaders/circle.wgsl"));
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Material Pipeline Layout"),
