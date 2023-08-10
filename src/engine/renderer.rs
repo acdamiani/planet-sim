@@ -1,8 +1,14 @@
-use super::{cam::Camera2D, mesh::MeshDrawCallBuilder, scene, shader::Shader};
+use super::{
+    buffer::{CameraBuffer, UniformBufferBinding},
+    cam::Camera2D,
+    mesh::MeshDrawCallBuilder,
+    scene,
+    shader::Shader,
+};
 use anyhow::{anyhow, Context, Ok, Result};
 use glam::Vec2;
-use std::collections::{hash_map::Entry, HashMap};
-use wgpu::DynamicOffset;
+use std::collections::{hash_map::Entry, HashMap, VecDeque};
+use wgpu::{BufferSize, DynamicOffset};
 
 pub struct Renderer {
     surface: wgpu::Surface,
@@ -11,6 +17,7 @@ pub struct Renderer {
     config: wgpu::SurfaceConfiguration,
     staging_belt: wgpu::util::StagingBelt,
     shaders: HashMap<&'static str, wgpu::ShaderModule>,
+    buffer_update: VecDeque<(usize, Box<[u8]>)>,
 }
 
 impl Renderer {
@@ -31,14 +38,19 @@ impl Renderer {
             // implemented
             staging_belt: wgpu::util::StagingBelt::new(0x60),
             shaders: HashMap::default(),
+            buffer_update: VecDeque::default(),
         }
     }
 
+    pub fn request_buffer_update(&mut self, id: usize, data: &[u8]) {
+        self.buffer_update.push_back((id, data.into()));
+    }
+
     pub fn render(
-        &self,
+        &mut self,
         scene: &scene::Scene,
         pipeline: &wgpu::RenderPipeline,
-        bind_groups: &[&wgpu::BindGroup],
+        camera_buffer: &UniformBufferBinding,
     ) -> Result<()> {
         let output = self
             .surface
@@ -53,6 +65,20 @@ impl Renderer {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Render encoder"),
             });
+
+        while let Some(v) = self.buffer_update.pop_front() {
+            if v.0 == camera_buffer.id() {
+                let mut buffer = self.staging_belt.write_buffer(
+                    &mut encoder,
+                    camera_buffer.buffer(),
+                    0x0,
+                    BufferSize::new(camera_buffer.len()).unwrap(),
+                    &self.device,
+                );
+
+                buffer.copy_from_slice(v.1.as_ref());
+            }
+        }
 
         let mut builders: Vec<MeshDrawCallBuilder> = Vec::with_capacity(scene.objects().len());
 
@@ -70,13 +96,10 @@ impl Renderer {
         });
 
         pass.set_pipeline(pipeline);
-
-        for (i, &bind_group) in bind_groups.iter().enumerate() {
-            pass.set_bind_group(i as u32, bind_group, &[])
-        }
+        pass.set_bind_group(0, camera_buffer.bind_group(), &[]);
 
         for (key, _value) in scene.objects() {
-            builders.push(scene.describe(key, &self));
+            builders.push(scene.describe(key, &self.device));
         }
 
         for call in &builders {
@@ -84,7 +107,12 @@ impl Renderer {
         }
 
         drop(pass);
+
+        self.staging_belt.finish();
+
         self.queue.submit(std::iter::once(encoder.finish()));
+
+        self.staging_belt.recall();
 
         output.present();
 

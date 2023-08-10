@@ -37,13 +37,9 @@ impl Scene {
         self.engine_objects.insert(object)
     }
 
-    pub fn describe<'a>(
-        &'a self,
-        key: EngineKey,
-        renderer: &renderer::Renderer,
-    ) -> MeshDrawCallBuilder {
+    pub fn describe<'a>(&'a self, key: EngineKey, device: &wgpu::Device) -> MeshDrawCallBuilder {
         let obj = &self.engine_objects[key];
-        obj.mesh().draw(&renderer)
+        obj.mesh().draw(device)
     }
 
     pub fn objects(&self) -> &HopSlotMap<EngineKey, EngineObject> {

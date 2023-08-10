@@ -1,10 +1,10 @@
 use glam::{Mat4, Quat, Vec2};
 
 pub struct Camera2D {
-    scale: f32,
-    rotation: f32,
-    translation: Vec2,
-    screen_size: Vec2,
+    pub scale: f32,
+    pub rotation: f32,
+    pub translation: Vec2,
+    pub screen_size: Vec2,
 }
 
 impl Camera2D {

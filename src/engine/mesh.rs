@@ -28,15 +28,12 @@ pub struct Mesh {
 }
 
 impl Mesh {
-    pub fn draw<'a>(&'a self, renderer: &renderer::Renderer) -> MeshDrawCallBuilder {
-        let vertex_buffer =
-            renderer
-                .device()
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Vertex Buffer"),
-                    contents: bytemuck::cast_slice(&self.vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
+    pub fn draw<'a>(&'a self, device: &wgpu::Device) -> MeshDrawCallBuilder {
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(&self.vertices),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
 
         let mut draw_call =
             MeshDrawCallBuilder::new(vertex_buffer, self.vertices.len().try_into().unwrap());
@@ -44,13 +41,11 @@ impl Mesh {
         match &self.indices {
             Some(ibuf) => {
                 draw_call = draw_call.with_indices(
-                    renderer
-                        .device()
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Index Buffer"),
-                            contents: bytemuck::cast_slice(&ibuf),
-                            usage: wgpu::BufferUsages::INDEX,
-                        }),
+                    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Index Buffer"),
+                        contents: bytemuck::cast_slice(&ibuf),
+                        usage: wgpu::BufferUsages::INDEX,
+                    }),
                     ibuf.len().try_into().unwrap(),
                 )
             }

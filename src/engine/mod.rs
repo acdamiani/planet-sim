@@ -1,3 +1,5 @@
+use crate::app::App;
+
 use self::{
     buffer::{CameraBuffer, UniformBuffer},
     cam::Camera2D,
@@ -8,13 +10,14 @@ use self::{
 };
 use anyhow::{Context, Result};
 use glam::Vec2;
-use std::vec;
+use std::{time::Instant, vec};
 use winit::{
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
 };
 
 pub struct Engine {
+    app: Option<App>,
     event_loop: EventLoop<()>,
     instance: wgpu::Instance,
     window: window::Window,
@@ -37,6 +40,7 @@ impl Engine {
         });
 
         Ok(Self {
+            app: None,
             event_loop,
             instance,
             window,
@@ -95,12 +99,15 @@ impl Engine {
             view_formats: vec![],
         };
 
-        self.renderer = Some(renderer::Renderer::new(
-            surface,
-            device,
-            queue,
-            surface_config,
-        ));
+        let renderer = renderer::Renderer::new(surface, device, queue, surface_config);
+
+        let config = renderer.config();
+        self.app = Some(App::new(Vec2::new(
+            config.width as f32,
+            config.height as f32,
+        )));
+
+        self.renderer = Some(renderer);
 
         Ok(())
     }
@@ -109,18 +116,9 @@ impl Engine {
         let mut renderer = self
             .renderer
             .context("init must be called before beginning the loop")?;
+        let mut app = self.app.unwrap();
 
-        let camera = Camera2D::new(
-            100.0,
-            0.0,
-            Vec2::ZERO,
-            Vec2::new(
-                renderer.config().width as f32,
-                renderer.config().height as f32,
-            ),
-        );
-
-        let camera_buffer = CameraBuffer::new(camera).bind(renderer.device());
+        let camera_binding = CameraBuffer::new(app.camera()).bind(renderer.device());
 
         let _shader = renderer.bind_shader(Shader::new(
             "s_wireframe",
@@ -128,7 +126,7 @@ impl Engine {
         ));
 
         let pipeline_builder = PipelineBuilder::new(pipeline::PipelineType::Wireframe)
-            .with_bind_group_layouts(Box::new([camera_buffer.bind_group_layout()]));
+            .with_bind_group_layouts(Box::new([camera_binding.bind_group_layout()]));
         let pipeline = pipeline_builder.build(renderer.device(), &renderer)?;
 
         let mut scene = scene::Scene::new(&renderer);
@@ -136,36 +134,53 @@ impl Engine {
         let obj = EngineObject::new(Mesh::from(Quad::default()));
         scene.issue_key(obj);
 
+        let mut last_render = Instant::now();
+
         self.event_loop
             .run(move |event, _, control_flow| match event {
                 Event::WindowEvent {
                     ref event,
                     window_id,
                 } if window_id == self.window.window().id() => {
-                    // TODO: Input handler goes here
-                    match event {
-                        WindowEvent::CloseRequested
-                        | WindowEvent::KeyboardInput {
-                            input:
-                                KeyboardInput {
-                                    state: ElementState::Pressed,
-                                    virtual_keycode: Some(VirtualKeyCode::Escape),
-                                    ..
-                                },
-                            ..
-                        } => *control_flow = ControlFlow::Exit,
-                        WindowEvent::Resized(size) => {
-                            match self.window.resize(renderer.config(), *size) {
-                                Some(config) => renderer.configure(config),
-                                None => {}
+                    if !app.input(event) {
+                        match event {
+                            WindowEvent::CloseRequested
+                            | WindowEvent::KeyboardInput {
+                                input:
+                                    KeyboardInput {
+                                        state: ElementState::Pressed,
+                                        virtual_keycode: Some(VirtualKeyCode::Escape),
+                                        ..
+                                    },
+                                ..
+                            } => *control_flow = ControlFlow::Exit,
+                            WindowEvent::Resized(size) => {
+                                match self.window.resize(renderer.config(), *size) {
+                                    Some(config) => {
+                                        app.resize(Vec2::new(
+                                            config.width as f32,
+                                            config.height as f32,
+                                        ));
+                                        renderer.configure(config);
+                                    }
+                                    None => {}
+                                }
                             }
+                            _ => {}
                         }
-                        _ => {}
                     }
                 }
                 Event::RedrawRequested(window_id) if window_id == self.window.window().id() => {
-                    // TODO: Update method goes here
-                    match renderer.render(&scene, &pipeline, &[camera_buffer.bind_group()]) {
+                    let now = Instant::now();
+                    let dt = now - last_render;
+                    last_render = now;
+
+                    renderer.request_buffer_update(
+                        camera_binding.id(),
+                        &app.update_and_build_controller(dt),
+                    );
+
+                    match renderer.render(&scene, &pipeline, &camera_binding) {
                         Ok(_) => {}
                         Err(error) => {
                             if let Some(surface_error) = error.downcast_ref::<wgpu::SurfaceError>()

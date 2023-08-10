@@ -1,8 +1,11 @@
+use super::cam::Camera2D;
+use std::sync::atomic::AtomicUsize;
 use wgpu::util::DeviceExt;
 
-use super::cam::Camera2D;
+static UB_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 pub struct UniformBufferBinding {
+    id: usize,
     buffer: wgpu::Buffer,
     data: Vec<u8>,
     group: wgpu::BindGroup,
@@ -10,6 +13,10 @@ pub struct UniformBufferBinding {
 }
 
 impl UniformBufferBinding {
+    pub fn id(&self) -> usize {
+        self.id
+    }
+
     pub fn buffer(&self) -> &wgpu::Buffer {
         &self.buffer
     }
@@ -25,23 +32,28 @@ impl UniformBufferBinding {
     pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         &self.group_layout
     }
+
+    pub fn len(&self) -> u64 {
+        self.data.len() as u64
+    }
 }
 
 pub trait UniformBuffer {
     fn bind(&self, device: &wgpu::Device) -> UniformBufferBinding;
+    fn get_data(&self) -> Vec<u8>;
 }
 
-pub struct CameraBuffer {
-    camera: Camera2D,
+pub struct CameraBuffer<'a> {
+    camera: &'a Camera2D,
 }
 
-impl CameraBuffer {
-    pub fn new(camera: Camera2D) -> Self {
+impl<'a> CameraBuffer<'a> {
+    pub fn new(camera: &'a Camera2D) -> Self {
         Self { camera }
     }
 }
 
-impl UniformBuffer for CameraBuffer {
+impl UniformBuffer for CameraBuffer<'_> {
     fn bind(&self, device: &wgpu::Device) -> UniformBufferBinding {
         let data = self.get_data();
         let group_layout = self.create_bind_group_layout(device);
@@ -49,19 +61,20 @@ impl UniformBuffer for CameraBuffer {
         let group = self.create_bind_group(device, &buffer, &group_layout);
 
         UniformBufferBinding {
+            id: UB_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
             buffer,
             data,
             group,
             group_layout,
         }
     }
-}
 
-impl CameraBuffer {
     fn get_data(&self) -> Vec<u8> {
         bytemuck::cast_slice(&[self.camera.build_proj_mat()]).to_vec()
     }
+}
 
+impl CameraBuffer<'_> {
     fn create_buffer(&self, device: &wgpu::Device, contents: &[u8]) -> wgpu::Buffer {
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera Buffer"),
