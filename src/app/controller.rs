@@ -1,5 +1,5 @@
 use crate::engine::cam::Camera2D;
-use glam::Vec2;
+use glam::{Quat, Vec2, Vec3, Vec3Swizzles};
 use std::time::Duration;
 use winit::{
     dpi::PhysicalPosition,
@@ -107,19 +107,23 @@ impl CameraController2D {
         let new_zoom = camera.scale + self.d_scale * dt;
         camera.scale = new_zoom.clamp(self.min_zoom, self.max_zoom);
 
-        self.pan_target += Vec2::new(
-            self.axis_x[1] - self.axis_x[0],
-            self.axis_y[1] - self.axis_y[0],
-        ) * 500.0
+        self.rotation_target += (self.axis_rotation[1] - self.axis_rotation[0]) * 5.0 * dt % 360.0;
+        let new_rotation = Self::f_lerp(camera.rotation, self.rotation_target, 0.1);
+        camera.rotation = new_rotation;
+
+        self.pan_target += (Quat::from_rotation_z(camera.rotation)
+            * Vec3::new(
+                self.axis_x[1] - self.axis_x[0],
+                self.axis_y[1] - self.axis_y[0],
+                0.0,
+            ))
+        .xy()
+            * 500.0
             / camera.scale
             * dt;
 
         let new_pan = camera.translation.lerp(self.pan_target, 0.1);
         camera.translation = new_pan;
-
-        self.rotation_target += (self.axis_rotation[1] - self.axis_rotation[0]) * 5.0 * dt % 360.0;
-        let new_rotation = Self::f_lerp(camera.rotation, self.rotation_target, 0.1);
-        camera.rotation = new_rotation;
 
         bytemuck::cast_slice(&[camera.build_proj_mat()]).to_vec()
     }
