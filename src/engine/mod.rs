@@ -1,5 +1,13 @@
-use self::{material::Material, mesh::*, object::EngineObject};
+use self::{
+    buffer::{CameraBuffer, UniformBuffer},
+    cam::Camera2D,
+    mesh::*,
+    object::EngineObject,
+    pipeline::PipelineBuilder,
+    shader::Shader,
+};
 use anyhow::{Context, Result};
+use glam::Vec2;
 use std::vec;
 use winit::{
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
@@ -102,12 +110,30 @@ impl Engine {
             .renderer
             .context("init must be called before beginning the loop")?;
 
-        let mut scene = scene::Scene::new();
-        let obj = EngineObject::new(
-            Mesh::from(Quad::default()),
-            Material::new(renderer.device(), renderer.config().format),
+        let camera = Camera2D::new(
+            100.0,
+            0.0,
+            Vec2::ZERO,
+            Vec2::new(
+                renderer.config().width as f32,
+                renderer.config().height as f32,
+            ),
         );
 
+        let camera_buffer = CameraBuffer::new(camera).bind(renderer.device());
+
+        let _shader = renderer.bind_shader(Shader::new(
+            "s_solid",
+            include_str!("../../assets/shaders/default.wgsl"),
+        ));
+
+        let pipeline_builder = PipelineBuilder::new(pipeline::PipelineType::Solid)
+            .with_bind_group_layouts(Box::new([camera_buffer.bind_group_layout()]));
+        let pipeline = pipeline_builder.build(renderer.device(), &renderer)?;
+
+        let mut scene = scene::Scene::new(&renderer);
+
+        let obj = EngineObject::new(Mesh::from(Quad::default()));
         scene.issue_key(obj);
 
         self.event_loop
@@ -139,13 +165,22 @@ impl Engine {
                 }
                 Event::RedrawRequested(window_id) if window_id == self.window.window().id() => {
                     // TODO: Update method goes here
-                    match renderer.render(&scene) {
+                    match renderer.render(&scene, &pipeline, &[camera_buffer.bind_group()]) {
                         Ok(_) => {}
-                        Err(wgpu::SurfaceError::Lost) => {
-                            self.window.resize(renderer.config(), self.window.size());
+                        Err(error) => {
+                            if let Some(surface_error) = error.downcast_ref::<wgpu::SurfaceError>()
+                            {
+                                match surface_error {
+                                    wgpu::SurfaceError::Lost => {
+                                        self.window.resize(renderer.config(), self.window.size());
+                                    }
+                                    wgpu::SurfaceError::OutOfMemory => {
+                                        *control_flow = ControlFlow::Exit;
+                                    }
+                                    e => eprintln!("{:?}", e),
+                                };
+                            };
                         }
-                        Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
-                        Err(e) => eprintln!("{:?}", e),
                     }
                 }
                 Event::MainEventsCleared => self.window.window().request_redraw(),
@@ -154,9 +189,12 @@ impl Engine {
     }
 }
 
-pub mod material;
+pub mod buffer;
+pub mod cam;
 pub mod mesh;
 pub mod object;
+pub mod pipeline;
 pub mod renderer;
 pub mod scene;
+pub mod shader;
 pub mod window;

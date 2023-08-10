@@ -1,20 +1,15 @@
-use super::{material, mesh};
+use super::mesh;
 use slotmap::new_key_type;
 
 new_key_type! { pub struct EngineKey; }
 
 pub struct EngineObject {
     mesh: mesh::Mesh,
-    material: material::Material,
 }
 
 impl EngineObject {
-    pub fn new(mesh: mesh::Mesh, material: material::Material) -> Self {
-        Self { mesh, material }
-    }
-
-    pub fn mat(&self) -> &material::Material {
-        &self.material
+    pub fn new(mesh: mesh::Mesh) -> Self {
+        Self { mesh }
     }
 
     pub fn mesh(&self) -> &mesh::Mesh {
