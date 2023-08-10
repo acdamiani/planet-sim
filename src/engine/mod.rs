@@ -123,11 +123,11 @@ impl Engine {
         let camera_buffer = CameraBuffer::new(camera).bind(renderer.device());
 
         let _shader = renderer.bind_shader(Shader::new(
-            "s_solid",
-            include_str!("../../assets/shaders/default.wgsl"),
+            "s_wireframe",
+            include_str!("../../assets/shaders/wire.wgsl"),
         ));
 
-        let pipeline_builder = PipelineBuilder::new(pipeline::PipelineType::Solid)
+        let pipeline_builder = PipelineBuilder::new(pipeline::PipelineType::Wireframe)
             .with_bind_group_layouts(Box::new([camera_buffer.bind_group_layout()]));
         let pipeline = pipeline_builder.build(renderer.device(), &renderer)?;
 
