@@ -125,7 +125,7 @@ impl Engine {
         ));
 
         let pipeline_builder = PipelineBuilder::new(pipeline::PipelineType::Solid)
-            .with_bind_group_layouts(Box::new([camera_binding.bind_group_layout()]));
+            .with_bind_group_layouts(&[camera_binding.bind_group_layout()]);
         let pipeline = pipeline_builder.build(renderer.device(), &renderer)?;
 
         let mut scene = scene::Scene::new(&renderer);
@@ -178,15 +178,12 @@ impl Engine {
                                 ..
                             } => *control_flow = ControlFlow::Exit,
                             WindowEvent::Resized(size) => {
-                                match self.window.resize(renderer.config(), *size) {
-                                    Some(config) => {
-                                        app.resize(Vec2::new(
-                                            config.width as f32,
-                                            config.height as f32,
-                                        ));
-                                        renderer.configure(config);
-                                    }
-                                    None => {}
+                                if let Some(config) = self.window.resize(renderer.config(), *size) {
+                                    app.resize(Vec2::new(
+                                        config.width as f32,
+                                        config.height as f32,
+                                    ));
+                                    renderer.configure(config);
                                 }
                             }
                             _ => {}

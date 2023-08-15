@@ -144,6 +144,12 @@ impl Tri {
     }
 }
 
+impl Default for Tri {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl From<Tri> for Mesh {
     fn from(_value: Tri) -> Self {
         let vertices = vec![

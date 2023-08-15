@@ -34,12 +34,12 @@ impl<'a> PipelineBuilder<'a> {
         self
     }
 
-    pub fn with_bind_group_layouts(mut self, layouts: Box<[&'a wgpu::BindGroupLayout]>) -> Self {
+    pub fn with_bind_group_layouts(mut self, layouts: &[&'a wgpu::BindGroupLayout]) -> Self {
         self.bind_group_layouts = layouts.to_vec();
         self
     }
 
-    pub fn with_push_constant_ranges(mut self, ranges: Box<[wgpu::PushConstantRange]>) -> Self {
+    pub fn with_push_constant_ranges(mut self, ranges: &[wgpu::PushConstantRange]) -> Self {
         self.push_constant_ranges = ranges.to_vec();
         self
     }

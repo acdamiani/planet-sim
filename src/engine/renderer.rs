@@ -138,6 +138,14 @@ impl Renderer {
 
 pub trait Odc<'a> {
     // WARN: lifetime spaghetti
+    // Quick explanation bc lifetimes are weird:
+    // We're declaring a lifetime `'a` on trait `Odc`
+    // In the draw method, we're assering (using the `where` keyword)
+    // that `'a` outlives `'r`, the lifetime of the `RenderPass`
+    // We declare it on the trait so that we can use it to tell rustc
+    // that any struct that implements this trait and uses this lifetime param
+    // as a generic argument outlives the `RenderPass`, satisfying wgpu's lifetime
+    // requirements
     fn draw<'r>(&self, pass: &mut wgpu::RenderPass<'r>)
     where
         'a: 'r;

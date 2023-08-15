@@ -10,7 +10,6 @@ pub struct CameraController2D {
     min_zoom: f32,
     max_zoom: f32,
     zoom_speed: f32,
-    pan_speed: f32,
     axis_x: [f32; 2],
     axis_y: [f32; 2],
     pan_target: Vec2,
@@ -20,10 +19,9 @@ pub struct CameraController2D {
 }
 
 impl CameraController2D {
-    pub fn new(zoom_speed: f32, pan_speed: f32, min_zoom: f32, max_zoom: f32) -> Self {
+    pub fn new(zoom_speed: f32, min_zoom: f32, max_zoom: f32) -> Self {
         Self {
             zoom_speed,
-            pan_speed,
             min_zoom,
             max_zoom,
             axis_x: [0.0, 0.0],
@@ -48,19 +46,19 @@ impl CameraController2D {
                     true
                 }
             },
-            WindowEvent::KeyboardInput { input, .. } => match input {
-                KeyboardInput {
+            WindowEvent::KeyboardInput { input, .. } => {
+                let KeyboardInput {
                     virtual_keycode,
                     state,
                     ..
-                } => {
-                    if let Some(v) = virtual_keycode {
-                        self.handle_keys(*v, *state)
-                    } else {
-                        false
-                    }
+                } = input;
+
+                if let Some(v) = virtual_keycode {
+                    self.handle_keys(*v, *state)
+                } else {
+                    false
                 }
-            },
+            }
             _ => false,
         }
     }
@@ -137,7 +135,6 @@ impl Default for CameraController2D {
     fn default() -> Self {
         Self {
             zoom_speed: 50.0,
-            pan_speed: 10.0,
             axis_x: [0.0, 0.0],
             axis_y: [0.0, 0.0],
             d_scale: 0.0,

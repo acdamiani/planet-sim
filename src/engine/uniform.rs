@@ -36,6 +36,10 @@ impl UniformBufferBinding {
     pub fn len(&self) -> u64 {
         self.data.len() as u64
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 pub trait UniformBuffer {

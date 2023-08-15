@@ -7,12 +7,9 @@ pub struct Window {
 
 impl Window {
     pub fn new(event_loop: &EventLoop<()>, window_name: Option<&str>) -> Result<Self, OsError> {
-        let name = match window_name {
-            Some(name) => name,
-            None => "New Window",
-        };
+        let name = window_name.unwrap_or("New Window");
 
-        let window = WindowBuilder::new().with_title(name).build(&event_loop)?;
+        let window = WindowBuilder::new().with_title(name).build(event_loop)?;
         let size = window.inner_size();
 
         Ok(Self { window, size })

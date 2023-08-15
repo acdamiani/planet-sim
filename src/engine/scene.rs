@@ -1,6 +1,6 @@
 use super::cam::Camera2D;
 use super::object::{EngineKey, EngineObject};
-use super::{renderer, uniform};
+use super::{renderer};
 use glam::Vec2;
 use slotmap::HopSlotMap;
 
