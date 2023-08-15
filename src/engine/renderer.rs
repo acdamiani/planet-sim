@@ -1,14 +1,10 @@
-use super::{
-    buffer::{CameraBuffer, UniformBufferBinding},
-    cam::Camera2D,
-    mesh::MeshDrawCallBuilder,
-    scene,
-    shader::Shader,
-};
+use super::{scene, shader::Shader, uniform::UniformBufferBinding};
 use anyhow::{anyhow, Context, Ok, Result};
-use glam::Vec2;
-use std::collections::{hash_map::Entry, HashMap, VecDeque};
-use wgpu::{BufferSize, DynamicOffset};
+use std::{
+    collections::{hash_map::Entry, HashMap, VecDeque},
+    ops::Range,
+};
+use wgpu::{BufferSize, BufferSlice};
 
 pub struct Renderer {
     surface: wgpu::Surface,
@@ -80,8 +76,6 @@ impl Renderer {
             }
         }
 
-        let mut builders: Vec<MeshDrawCallBuilder> = Vec::with_capacity(scene.objects().len());
-
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -98,42 +92,20 @@ impl Renderer {
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, camera_buffer.bind_group(), &[]);
 
-        for (key, _value) in scene.objects() {
-            builders.push(scene.describe(key, &self.device));
-        }
-
-        for call in &builders {
-            Self::parse_draw_call(call, &mut pass);
+        for (_key, value) in scene.objects() {
+            let odc = value.odc();
+            odc.draw(&mut pass);
         }
 
         drop(pass);
 
         self.staging_belt.finish();
-
         self.queue.submit(std::iter::once(encoder.finish()));
-
         self.staging_belt.recall();
 
         output.present();
 
         Ok(())
-    }
-
-    fn parse_draw_call<'a>(call: &'a MeshDrawCallBuilder, pass: &mut wgpu::RenderPass<'a>) {
-        let (vbuf, lvbuf) = call.v_buf();
-        let oibuf = call.i_buf();
-
-        pass.set_vertex_buffer(0, vbuf.slice(..));
-
-        match oibuf {
-            Some((ibuf, libuf)) => {
-                pass.set_index_buffer(ibuf.slice(..), wgpu::IndexFormat::Uint16);
-                pass.draw_indexed(0..libuf, 0, 0..1);
-            }
-            None => {
-                pass.draw(0..lvbuf, 0..1);
-            }
-        }
     }
 
     pub fn bind_shader(&mut self, shader: Shader) -> Result<&wgpu::ShaderModule> {
@@ -161,5 +133,97 @@ impl Renderer {
 
     pub fn device(&self) -> &wgpu::Device {
         &self.device
+    }
+}
+
+pub trait Odc<'a> {
+    // WARN: lifetime spaghetti
+    fn draw<'r>(&self, pass: &mut wgpu::RenderPass<'r>)
+    where
+        'a: 'r;
+}
+
+pub struct VertexDc<'a> {
+    vertex_buffer: BufferSlice<'a>,
+    instance_buffer: BufferSlice<'a>,
+    vertices: Range<u32>,
+    instances: Range<u32>,
+}
+
+impl<'a> VertexDc<'a> {
+    pub fn new(
+        vertex_buffer: BufferSlice<'a>,
+        instance_buffer: BufferSlice<'a>,
+        vertices: Range<u32>,
+        instances: Range<u32>,
+    ) -> Self {
+        Self {
+            vertex_buffer,
+            instance_buffer,
+            vertices,
+            instances,
+        }
+    }
+}
+
+impl<'a> Odc<'a> for VertexDc<'a> {
+    fn draw<'r>(&self, pass: &mut wgpu::RenderPass<'r>)
+    where
+        'a: 'r,
+    {
+        pass.set_vertex_buffer(0, self.vertex_buffer);
+        pass.set_vertex_buffer(1, self.instance_buffer);
+        pass.draw(self.vertices.clone(), self.instances.clone());
+    }
+}
+
+pub struct IndexedDc<'a> {
+    vertex_buffer: BufferSlice<'a>,
+    instance_buffer: BufferSlice<'a>,
+    index_buffer: BufferSlice<'a>,
+    indices: Range<u32>,
+    instances: Range<u32>,
+    format: Option<wgpu::IndexFormat>,
+    base_vertex: Option<i32>,
+}
+
+impl<'a> IndexedDc<'a> {
+    pub fn new(
+        vertex_buffer: BufferSlice<'a>,
+        instance_buffer: BufferSlice<'a>,
+        index_buffer: BufferSlice<'a>,
+        indices: Range<u32>,
+        instances: Range<u32>,
+        format: Option<wgpu::IndexFormat>,
+        base_vertex: Option<i32>,
+    ) -> Self {
+        Self {
+            vertex_buffer,
+            instance_buffer,
+            index_buffer,
+            indices,
+            instances,
+            format,
+            base_vertex,
+        }
+    }
+}
+
+impl<'a> Odc<'a> for IndexedDc<'a> {
+    fn draw<'r>(&self, pass: &mut wgpu::RenderPass<'r>)
+    where
+        'a: 'r,
+    {
+        pass.set_vertex_buffer(0, self.vertex_buffer);
+        pass.set_vertex_buffer(1, self.instance_buffer);
+        pass.set_index_buffer(
+            self.index_buffer,
+            self.format.unwrap_or(wgpu::IndexFormat::Uint16),
+        );
+        pass.draw_indexed(
+            self.indices.clone(),
+            self.base_vertex.unwrap_or(0),
+            self.instances.clone(),
+        );
     }
 }

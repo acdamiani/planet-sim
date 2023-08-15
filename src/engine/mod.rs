@@ -1,15 +1,14 @@
 use crate::app::App;
 
 use self::{
-    buffer::{CameraBuffer, UniformBuffer},
-    cam::Camera2D,
     mesh::*,
-    object::EngineObject,
+    object::{EngineObject, Instance},
     pipeline::PipelineBuilder,
     shader::Shader,
+    uniform::{CameraBuffer, UniformBuffer},
 };
 use anyhow::{Context, Result};
-use glam::Vec2;
+use glam::{Quat, Vec2, Vec3};
 use std::{time::Instant, vec};
 use winit::{
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
@@ -121,18 +120,42 @@ impl Engine {
         let camera_binding = CameraBuffer::new(app.camera()).bind(renderer.device());
 
         let _shader = renderer.bind_shader(Shader::new(
-            "s_wireframe",
-            include_str!("../../assets/shaders/wire.wgsl"),
+            "s_solid",
+            include_str!("../../assets/shaders/default.wgsl"),
         ));
 
-        let pipeline_builder = PipelineBuilder::new(pipeline::PipelineType::Wireframe)
+        let pipeline_builder = PipelineBuilder::new(pipeline::PipelineType::Solid)
             .with_bind_group_layouts(Box::new([camera_binding.bind_group_layout()]));
         let pipeline = pipeline_builder.build(renderer.device(), &renderer)?;
 
         let mut scene = scene::Scene::new(&renderer);
 
-        let obj = EngineObject::new(Mesh::from(Quad::default()));
-        scene.issue_key(obj);
+        scene.issue_key(EngineObject::new(
+            Mesh::from(Quad::default()),
+            vec![
+                Instance::new(
+                    Vec2::ZERO,
+                    Quat::from_rotation_z(0.0),
+                    Vec3::new(1.0, 0.0, 0.0),
+                ),
+                Instance::new(
+                    Vec2::ONE,
+                    Quat::from_rotation_z(0.0),
+                    Vec3::new(0.0, 1.0, 0.0),
+                ),
+            ],
+            renderer.device(),
+        ));
+
+        scene.issue_key(EngineObject::new(
+            Mesh::from(Tri::new()),
+            vec![Instance::new(
+                Vec2::NEG_ONE,
+                Quat::from_rotation_z(0.0),
+                Vec3::new(0.0, 0.0, 1.0),
+            )],
+            renderer.device(),
+        ));
 
         let mut last_render = Instant::now();
 
@@ -204,7 +227,6 @@ impl Engine {
     }
 }
 
-pub mod buffer;
 pub mod cam;
 pub mod mesh;
 pub mod object;
@@ -212,4 +234,5 @@ pub mod pipeline;
 pub mod renderer;
 pub mod scene;
 pub mod shader;
+pub mod uniform;
 pub mod window;

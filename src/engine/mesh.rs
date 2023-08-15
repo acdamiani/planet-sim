@@ -1,4 +1,5 @@
-use crate::engine::renderer;
+use std::ops::Range;
+
 use glam::{Vec2, Vec3};
 use wgpu::util::DeviceExt;
 
@@ -27,67 +28,60 @@ pub struct Mesh {
     indices: Option<Vec<u16>>,
 }
 
-impl Mesh {
-    pub fn draw<'a>(&'a self, device: &wgpu::Device) -> MeshDrawCallBuilder {
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(&self.vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+pub struct MeshDescriptor {
+    vertex_buffer: wgpu::Buffer,
+    index_buffer: Option<wgpu::Buffer>,
+    vertices: u32,
+    indices: u32,
+}
 
-        let mut draw_call =
-            MeshDrawCallBuilder::new(vertex_buffer, self.vertices.len().try_into().unwrap());
+impl MeshDescriptor {
+    pub fn vertex_buffer(&self) -> &wgpu::Buffer {
+        &self.vertex_buffer
+    }
 
-        match &self.indices {
-            Some(ibuf) => {
-                draw_call = draw_call.with_indices(
+    pub fn index_buffer(&self) -> Option<&wgpu::Buffer> {
+        self.index_buffer.as_ref()
+    }
+
+    pub fn vertices(&self) -> Range<u32> {
+        0..self.vertices
+    }
+
+    pub fn indices(&self) -> Range<u32> {
+        0..self.indices
+    }
+}
+
+impl MeshDescriptor {
+    pub fn new(mesh: Mesh, device: &wgpu::Device) -> Self {
+        let (vertex_buffer, vertices) = (
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Vertex Buffer"),
+                contents: bytemuck::cast_slice(&mesh.vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            }),
+            mesh.vertices.len() as u32,
+        );
+
+        let (index_buffer, indices) = mesh.indices.map_or((None, 0), |i| {
+            (
+                Some(
                     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                         label: Some("Index Buffer"),
-                        contents: bytemuck::cast_slice(&ibuf),
+                        contents: bytemuck::cast_slice(&i),
                         usage: wgpu::BufferUsages::INDEX,
                     }),
-                    ibuf.len().try_into().unwrap(),
-                )
-            }
-            None => {}
-        }
+                ),
+                i.len() as u32,
+            )
+        });
 
-        draw_call
-    }
-}
-
-pub struct MeshDrawCallBuilder {
-    vertex_buffer: wgpu::Buffer,
-    vertices_count: u32,
-    index_buffer: Option<wgpu::Buffer>,
-    indices_count: Option<u32>,
-}
-
-// TODO: Instancing
-impl MeshDrawCallBuilder {
-    pub fn new(vertex_buffer: wgpu::Buffer, len: u32) -> Self {
         Self {
             vertex_buffer,
-            vertices_count: len,
-            index_buffer: None,
-            indices_count: None,
-        }
-    }
-
-    pub fn with_indices(mut self, buffer: wgpu::Buffer, len: u32) -> Self {
-        self.index_buffer = Some(buffer);
-        self.indices_count = Some(len);
-        self
-    }
-
-    pub fn v_buf(&self) -> (&wgpu::Buffer, u32) {
-        (&self.vertex_buffer, self.vertices_count)
-    }
-
-    pub fn i_buf(&self) -> Option<(&wgpu::Buffer, u32)> {
-        match &self.index_buffer {
-            Some(i) => Some((i, self.indices_count.unwrap())),
-            None => None,
+            vertices,
+            index_buffer,
+            indices,
         }
     }
 }
@@ -167,7 +161,7 @@ impl From<Tri> for Mesh {
             },
         ];
 
-        Self {
+        Mesh {
             vertices,
             indices: None,
         }

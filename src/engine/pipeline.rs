@@ -1,9 +1,9 @@
-use anyhow::{Context, Result};
-
 use super::{
     mesh::{self, Vertex},
+    object,
     renderer::Renderer,
 };
+use anyhow::{Context, Result};
 
 pub enum PipelineType {
     Solid,
@@ -76,7 +76,7 @@ impl<'a> PipelineBuilder<'a> {
                     vertex: wgpu::VertexState {
                         module: shader,
                         entry_point: "vs_main",
-                        buffers: &[mesh::Vertex::desc()],
+                        buffers: &[mesh::Vertex::desc(), object::Instance::desc()],
                     },
                     fragment: Some(wgpu::FragmentState {
                         module: shader,
@@ -116,7 +116,7 @@ impl<'a> PipelineBuilder<'a> {
                     vertex: wgpu::VertexState {
                         module: shader,
                         entry_point: "vs_main",
-                        buffers: &[Vertex::desc()],
+                        buffers: &[Vertex::desc(), object::Instance::desc()],
                     },
                     fragment: Some(wgpu::FragmentState {
                         module: shader,

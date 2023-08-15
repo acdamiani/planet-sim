@@ -1,7 +1,6 @@
 use super::cam::Camera2D;
-use super::mesh::MeshDrawCallBuilder;
 use super::object::{EngineKey, EngineObject};
-use super::{buffer, renderer};
+use super::{renderer, uniform};
 use glam::Vec2;
 use slotmap::HopSlotMap;
 
@@ -35,11 +34,6 @@ impl Scene {
 
     pub fn issue_key(&mut self, object: EngineObject) -> EngineKey {
         self.engine_objects.insert(object)
-    }
-
-    pub fn describe<'a>(&'a self, key: EngineKey, device: &wgpu::Device) -> MeshDrawCallBuilder {
-        let obj = &self.engine_objects[key];
-        obj.mesh().draw(device)
     }
 
     pub fn objects(&self) -> &HopSlotMap<EngineKey, EngineObject> {
