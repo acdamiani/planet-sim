@@ -15,9 +15,9 @@ pub struct EngineObject {
 }
 
 pub struct Instance {
-    position: Vec2,
-    rotation: Quat,
-    color: Vec3,
+    pub position: Vec2,
+    pub rotation: Quat,
+    pub color: Vec3,
 }
 
 #[repr(C)]
@@ -54,7 +54,7 @@ impl Instance {
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Instance Buffer"),
             contents: &data,
-            usage: wgpu::BufferUsages::VERTEX,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         })
     }
 
@@ -99,6 +99,26 @@ impl Instance {
     }
 }
 
+pub struct RawStageBuffer<'a> {
+    buffer: &'a wgpu::Buffer,
+    offset: wgpu::BufferAddress,
+    size: wgpu::BufferSize,
+}
+
+impl<'a> RawStageBuffer<'a> {
+    pub fn buffer(&self) -> &'a wgpu::Buffer {
+        self.buffer
+    }
+
+    pub fn offset(&self) -> wgpu::BufferAddress {
+        self.offset
+    }
+
+    pub fn size(&self) -> wgpu::BufferSize {
+        self.size
+    }
+}
+
 impl EngineObject {
     pub fn new(mesh: mesh::Mesh, instances: Vec<Instance>, device: &wgpu::Device) -> Self {
         let buffer = Instance::buffer(&instances, device);
@@ -107,6 +127,17 @@ impl EngineObject {
             mesh: desc,
             instances,
             instance_buffer: buffer,
+        }
+    }
+
+    pub fn staged_instance_buffer<'a>(&'a self) -> RawStageBuffer<'a> {
+        let inst_raw_size = std::mem::size_of::<InstanceRaw>() as u64;
+        let ct_inst = self.instances.len() as u64;
+
+        RawStageBuffer {
+            buffer: &self.instance_buffer,
+            offset: 0x0,
+            size: wgpu::BufferSize::new(inst_raw_size * ct_inst).unwrap(),
         }
     }
 
@@ -140,5 +171,9 @@ impl EngineObject {
 
     pub fn instances(&self) -> &[Instance] {
         &self.instances
+    }
+
+    pub fn instances_mut(&mut self) -> &mut [Instance] {
+        &mut self.instances
     }
 }

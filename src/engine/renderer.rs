@@ -1,5 +1,6 @@
-use super::{scene, shader::Shader, uniform::UniformBufferBinding};
+use super::{object, scene, shader::Shader, uniform::UniformBufferBinding};
 use anyhow::{anyhow, Context, Ok, Result};
+use slotmap::SecondaryMap;
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     ops::Range,
@@ -13,7 +14,9 @@ pub struct Renderer {
     config: wgpu::SurfaceConfiguration,
     staging_belt: wgpu::util::StagingBelt,
     shaders: HashMap<&'static str, wgpu::ShaderModule>,
+    // Using a boxed slice over a Vec because I don't want mutability
     buffer_update: VecDeque<(usize, Box<[u8]>)>,
+    instance_data: SecondaryMap<object::EngineKey, Box<[u8]>>,
 }
 
 impl Renderer {
@@ -35,7 +38,20 @@ impl Renderer {
             staging_belt: wgpu::util::StagingBelt::new(0x60),
             shaders: HashMap::default(),
             buffer_update: VecDeque::default(),
+            instance_data: SecondaryMap::default(),
         }
+    }
+
+    pub fn instance_buffer_update(&mut self, instance: object::EngineKey, data: &[u8]) {
+        if let Some(cur) = self.instance_data.get_mut(instance) {
+            *cur = data.into();
+        } else {
+            self.instance_data.insert(instance, data.into());
+        }
+    }
+
+    pub fn stop_instance_buffer_update(&mut self, instance: object::EngineKey) {
+        self.instance_data.remove(instance);
     }
 
     pub fn request_buffer_update(&mut self, id: usize, data: &[u8]) {
@@ -74,6 +90,18 @@ impl Renderer {
 
                 buffer.copy_from_slice(v.1.as_ref());
             }
+        }
+
+        for (key, value) in self.instance_data.iter() {
+            let staged = scene.objects()[key].staged_instance_buffer();
+            let mut buffer = self.staging_belt.write_buffer(
+                &mut encoder,
+                staged.buffer(),
+                staged.offset(),
+                staged.size(),
+                &self.device,
+            );
+            buffer.copy_from_slice(value);
         }
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {

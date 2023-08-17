@@ -1,6 +1,6 @@
 use super::cam::Camera2D;
 use super::object::{EngineKey, EngineObject};
-use super::{renderer};
+use super::renderer;
 use glam::Vec2;
 use slotmap::HopSlotMap;
 
@@ -38,6 +38,10 @@ impl Scene {
 
     pub fn objects(&self) -> &HopSlotMap<EngineKey, EngineObject> {
         &self.engine_objects
+    }
+
+    pub fn objects_mut(&mut self) -> &mut HopSlotMap<EngineKey, EngineObject> {
+        &mut self.engine_objects
     }
 
     pub fn camera(&self) -> &Camera2D {

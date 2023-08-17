@@ -2,7 +2,7 @@ use crate::app::App;
 
 use self::{
     mesh::*,
-    object::{EngineObject, Instance},
+    object::{EngineKey, EngineObject, Instance},
     pipeline::PipelineBuilder,
     shader::Shader,
     uniform::{CameraBuffer, UniformBuffer},
@@ -111,6 +111,17 @@ impl Engine {
         Ok(())
     }
 
+    // TODO: Remove key param and move into /sim
+    fn update(renderer: &mut renderer::Renderer, scene: &mut scene::Scene, key: EngineKey) {
+        let object = scene.objects_mut().get_mut(key).unwrap();
+        for instance in object.instances_mut() {
+            let delta = Quat::from_rotation_z(0.01);
+            instance.rotation *= delta;
+        }
+
+        renderer.instance_buffer_update(key, &Instance::data(object.instances()));
+    }
+
     pub fn begin_loop(mut self) -> Result<()> {
         let mut renderer = self
             .renderer
@@ -130,7 +141,7 @@ impl Engine {
 
         let mut scene = scene::Scene::new(&renderer);
 
-        scene.issue_key(EngineObject::new(
+        let key_one = scene.issue_key(EngineObject::new(
             Mesh::from(Quad::default()),
             vec![
                 Instance::new(
@@ -199,6 +210,8 @@ impl Engine {
                         camera_binding.id(),
                         &app.update_and_build_controller(dt),
                     );
+
+                    Engine::update(&mut renderer, &mut scene, key_one);
 
                     match renderer.render(&scene, &pipeline, &camera_binding) {
                         Ok(_) => {}
