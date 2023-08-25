@@ -2,7 +2,7 @@ use super::{
     mesh::{self, MeshDescriptor},
     renderer,
 };
-use glam::{Mat4, Quat, Vec2, Vec3};
+use glam::{Mat4, Quat, Vec3};
 use slotmap::new_key_type;
 use wgpu::util::DeviceExt;
 
@@ -15,20 +15,20 @@ pub struct EngineObject {
 }
 
 pub struct Instance {
-    pub position: Vec2,
+    pub position: Vec3,
     pub rotation: Quat,
     pub color: Vec3,
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct InstanceRaw {
+pub struct InstanceRaw {
     mat: [[f32; 4]; 4],
     color: [f32; 3],
 }
 
 impl Instance {
-    pub fn new(position: Vec2, rotation: Quat, color: Vec3) -> Self {
+    pub fn new(position: Vec3, rotation: Quat, color: Vec3) -> Self {
         Self {
             position,
             rotation,
@@ -36,24 +36,19 @@ impl Instance {
         }
     }
 
-    fn as_raw(&self) -> InstanceRaw {
+    pub fn as_raw(&self) -> InstanceRaw {
         InstanceRaw {
-            mat: Mat4::from_rotation_translation(self.rotation, self.position.extend(0.0))
-                .to_cols_array_2d(),
+            mat: Mat4::from_rotation_translation(self.rotation, self.position).to_cols_array_2d(),
             color: self.color.into(),
         }
     }
 
-    pub fn data(instances: &[Instance]) -> Box<[u8]> {
-        let instance_data = instances.iter().map(Instance::as_raw).collect::<Vec<_>>();
-        bytemuck::cast_slice(&instance_data).into()
-    }
-
     pub fn buffer(instances: &[Instance], device: &wgpu::Device) -> wgpu::Buffer {
-        let data = Instance::data(instances);
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Instance Buffer"),
-            contents: &data,
+            contents: bytemuck::cast_slice(
+                &instances.iter().map(Instance::as_raw).collect::<Vec<_>>(),
+            ),
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         })
     }

@@ -15,3 +15,4 @@ bytemuck = { version = "1.12", features = [ "derive" ] }
 anyhow = "1.0.72"
 slotmap = "1.0.6"
 glam = { version = "0.24.1", features = [ "bytemuck" ] }
+colorous = "1.0.12"

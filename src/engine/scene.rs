@@ -1,7 +1,11 @@
+use std::borrow::Cow;
+
 use super::cam::Camera2D;
-use super::object::{EngineKey, EngineObject};
+use super::mesh::{Mesh, Quad};
+use super::object::{EngineKey, EngineObject, Instance, InstanceRaw};
 use super::renderer;
-use glam::Vec2;
+use crate::sim::Sim;
+use glam::{Vec2, Vec3};
 use slotmap::HopSlotMap;
 
 pub struct Scene {
@@ -10,11 +14,33 @@ pub struct Scene {
     // Iteration is significantly faster, however
     engine_objects: HopSlotMap<EngineKey, EngineObject>,
     camera: Camera2D,
+    sim: Sim,
+    sim_key: EngineKey,
+    grad: colorous::Gradient,
 }
 
 impl Scene {
     pub fn new(renderer: &renderer::Renderer) -> Self {
-        let sm: HopSlotMap<EngineKey, EngineObject> = HopSlotMap::with_capacity_and_key(1024);
+        let mut sm: HopSlotMap<EngineKey, EngineObject> = HopSlotMap::with_capacity_and_key(1024);
+        let sim = Sim::new();
+        let instances = sim
+            .system()
+            .bodies()
+            .iter()
+            .map(|b| {
+                Instance::new(
+                    b.position().as_vec3(),
+                    glam::Quat::from_rotation_z(0.0),
+                    glam::Vec3::new(1.0, 0.0, 0.0),
+                )
+            })
+            .collect::<Vec<Instance>>();
+
+        let sim_key = sm.insert(EngineObject::new(
+            Mesh::from(Quad::default()),
+            instances,
+            renderer.device(),
+        ));
 
         let camera = Camera2D::new(
             1.0,
@@ -29,7 +55,39 @@ impl Scene {
         Self {
             engine_objects: sm,
             camera,
+            sim,
+            sim_key,
+            grad: colorous::VIRIDIS,
         }
+    }
+
+    // TODO: Move to util mod
+    fn rgb_vec(r: u8, g: u8, b: u8) -> Vec3 {
+        Vec3::new(
+            r as f32 / u8::MAX as f32,
+            g as f32 / u8::MAX as f32,
+            b as f32 / u8::MAX as f32,
+        )
+    }
+
+    pub fn step_sim(&mut self, dt: f64) -> (EngineKey, &EngineObject) {
+        self.sim.step(dt);
+
+        let object = &mut self.engine_objects[self.sim_key];
+        for (i, b) in object
+            .instances_mut()
+            .iter_mut()
+            .zip(self.sim.system().bodies())
+        {
+            let color = self
+                .grad
+                .eval_continuous(b.velocity().length_squared() / 100.0);
+
+            i.position = b.position().as_vec3();
+            i.color = Self::rgb_vec(color.r, color.g, color.b);
+        }
+
+        (self.sim_key, object)
     }
 
     pub fn issue_key(&mut self, object: EngineObject) -> EngineKey {

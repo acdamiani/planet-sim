@@ -111,17 +111,6 @@ impl Engine {
         Ok(())
     }
 
-    // TODO: Remove key param and move into /sim
-    fn update(renderer: &mut renderer::Renderer, scene: &mut scene::Scene, key: EngineKey) {
-        let object = scene.objects_mut().get_mut(key).unwrap();
-        for instance in object.instances_mut() {
-            let delta = Quat::from_rotation_z(0.01);
-            instance.rotation *= delta;
-        }
-
-        renderer.instance_buffer_update(key, &Instance::data(object.instances()));
-    }
-
     pub fn begin_loop(mut self) -> Result<()> {
         let mut renderer = self
             .renderer
@@ -140,33 +129,6 @@ impl Engine {
         let pipeline = pipeline_builder.build(renderer.device(), &renderer)?;
 
         let mut scene = scene::Scene::new(&renderer);
-
-        let key_one = scene.issue_key(EngineObject::new(
-            Mesh::from(Quad::default()),
-            vec![
-                Instance::new(
-                    Vec2::ZERO,
-                    Quat::from_rotation_z(0.0),
-                    Vec3::new(1.0, 0.0, 0.0),
-                ),
-                Instance::new(
-                    Vec2::ONE,
-                    Quat::from_rotation_z(0.0),
-                    Vec3::new(0.0, 1.0, 0.0),
-                ),
-            ],
-            renderer.device(),
-        ));
-
-        scene.issue_key(EngineObject::new(
-            Mesh::from(Tri::new()),
-            vec![Instance::new(
-                Vec2::NEG_ONE,
-                Quat::from_rotation_z(0.0),
-                Vec3::new(0.0, 0.0, 1.0),
-            )],
-            renderer.device(),
-        ));
 
         let mut last_render = Instant::now();
 
@@ -211,7 +173,16 @@ impl Engine {
                         &app.update_and_build_controller(dt),
                     );
 
-                    Engine::update(&mut renderer, &mut scene, key_one);
+                    let (k, o) = scene.step_sim(dt.as_secs_f64());
+                    renderer.instance_buffer_update(
+                        k,
+                        bytemuck::cast_slice(
+                            &o.instances()
+                                .iter()
+                                .map(Instance::as_raw)
+                                .collect::<Vec<_>>(),
+                        ),
+                    );
 
                     match renderer.render(&scene, &pipeline, &camera_binding) {
                         Ok(_) => {}
