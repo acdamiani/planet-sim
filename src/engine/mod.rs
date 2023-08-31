@@ -173,7 +173,7 @@ impl Engine {
                         &app.update_and_build_controller(dt),
                     );
 
-                    let (k, o) = scene.step_sim(dt.as_secs_f64());
+                    let (k, o) = scene.step_sim(dt.as_secs_f64() / 12.0);
                     renderer.instance_buffer_update(
                         k,
                         bytemuck::cast_slice(

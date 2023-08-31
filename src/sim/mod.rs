@@ -11,13 +11,15 @@ impl Sim {
     pub fn new() -> Self {
         let mut system = System::new();
 
-        let mut body = BodyBuilder::new(1500000000000.0)
-            .with_position(DVec3::new(0.0, 5.0, 0.0))
+        // 1 solar mass (sun)
+        let mut body = BodyBuilder::new(1.0)
+            .with_position(DVec3::new(0.0, 0.0, 0.0))
             .build();
         system.insert(body);
-        body = BodyBuilder::new(100.0)
-            .with_position(DVec3::new(0.0, -5.0, 0.0))
-            .with_velocity(DVec3::new(5.0, 0.0, 0.0))
+        // Earth
+        body = BodyBuilder::new(3e-6)
+            .with_position(DVec3::new(0.0, -0.98329, 0.0))
+            .with_velocity(DVec3::new(6.38966, 0.0, 0.0))
             .build();
         system.insert(body);
 

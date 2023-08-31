@@ -37,7 +37,7 @@ impl Scene {
             .collect::<Vec<Instance>>();
 
         let sim_key = sm.insert(EngineObject::new(
-            Mesh::from(Quad::default()),
+            Mesh::from(Quad::new(0.25 * Vec2::ONE)),
             instances,
             renderer.device(),
         ));
