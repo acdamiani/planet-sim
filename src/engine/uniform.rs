@@ -1,4 +1,3 @@
-use super::cam::Camera2D;
 use std::sync::atomic::AtomicUsize;
 use wgpu::util::DeviceExt;
 
@@ -43,23 +42,19 @@ impl UniformBufferBinding {
 }
 
 pub trait UniformBuffer {
-    fn bind(&self, device: &wgpu::Device) -> UniformBufferBinding;
-    fn get_data(&self) -> Vec<u8>;
+    fn bind(&self, data: &[u8], device: &wgpu::Device) -> UniformBufferBinding;
 }
 
-pub struct CameraBuffer<'a> {
-    camera: &'a Camera2D,
-}
+pub struct ScreenBuffer;
 
-impl<'a> CameraBuffer<'a> {
-    pub fn new(camera: &'a Camera2D) -> Self {
-        Self { camera }
+impl ScreenBuffer {
+    pub fn new() -> Self {
+        Self
     }
 }
 
-impl UniformBuffer for CameraBuffer<'_> {
-    fn bind(&self, device: &wgpu::Device) -> UniformBufferBinding {
-        let data = self.get_data();
+impl UniformBuffer for ScreenBuffer {
+    fn bind(&self, data: &[u8], device: &wgpu::Device) -> UniformBufferBinding {
         let group_layout = self.create_bind_group_layout(device);
         let buffer = self.create_buffer(device, &data);
         let group = self.create_bind_group(device, &buffer, &group_layout);
@@ -67,18 +62,80 @@ impl UniformBuffer for CameraBuffer<'_> {
         UniformBufferBinding {
             id: UB_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
             buffer,
-            data,
+            data: data.to_vec(),
             group,
             group_layout,
         }
     }
+}
 
-    fn get_data(&self) -> Vec<u8> {
-        bytemuck::cast_slice(&[self.camera.build_proj_mat()]).to_vec()
+impl ScreenBuffer {
+    fn create_buffer(&self, device: &wgpu::Device, contents: &[u8]) -> wgpu::Buffer {
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Screen Buffer"),
+            contents,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        })
+    }
+
+    fn create_bind_group(
+        &self,
+        device: &wgpu::Device,
+        buffer: &wgpu::Buffer,
+        layout: &wgpu::BindGroupLayout,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout,
+            label: Some("screen_bind_group"),
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        })
+    }
+
+    fn create_bind_group_layout(&self, device: &wgpu::Device) -> wgpu::BindGroupLayout {
+        device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+            label: Some("screen_bind_group"),
+        })
     }
 }
 
-impl CameraBuffer<'_> {
+pub struct CameraBuffer;
+
+impl CameraBuffer {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl UniformBuffer for CameraBuffer {
+    fn bind(&self, data: &[u8], device: &wgpu::Device) -> UniformBufferBinding {
+        let group_layout = self.create_bind_group_layout(device);
+        let buffer = self.create_buffer(device, &data);
+        let group = self.create_bind_group(device, &buffer, &group_layout);
+
+        UniformBufferBinding {
+            id: UB_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+            buffer,
+            data: data.to_vec(),
+            group,
+            group_layout,
+        }
+    }
+}
+
+impl CameraBuffer {
     fn create_buffer(&self, device: &wgpu::Device, contents: &[u8]) -> wgpu::Buffer {
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera Buffer"),

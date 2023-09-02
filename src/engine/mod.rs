@@ -101,10 +101,7 @@ impl Engine {
         let renderer = renderer::Renderer::new(surface, device, queue, surface_config);
 
         let config = renderer.config();
-        self.app = Some(App::new(Vec2::new(
-            config.width as f32,
-            config.height as f32,
-        )));
+        self.app = Some(App::new(config.width, config.height));
 
         self.renderer = Some(renderer);
 
@@ -117,7 +114,7 @@ impl Engine {
             .context("init must be called before beginning the loop")?;
         let mut app = self.app.unwrap();
 
-        let camera_binding = CameraBuffer::new(app.camera()).bind(renderer.device());
+        let camera_binding = CameraBuffer::new().bind(&app.uniform_data(), renderer.device());
 
         let _shader = renderer.bind_shader(Shader::new(
             "s_solid",
@@ -125,7 +122,12 @@ impl Engine {
         ));
 
         let pipeline_builder = PipelineBuilder::new(pipeline::PipelineType::Solid)
-            .with_bind_group_layouts(&[camera_binding.bind_group_layout()]);
+            .with_bind_group_layouts(&[
+                camera_binding.bind_group_layout(),
+                renderer.screen_binding().bind_group_layout(),
+            ]);
+
+        println!("{}", renderer.config().width);
         let pipeline = pipeline_builder.build(renderer.device(), &renderer)?;
 
         let mut scene = scene::Scene::new(&renderer);
@@ -152,10 +154,7 @@ impl Engine {
                             } => *control_flow = ControlFlow::Exit,
                             WindowEvent::Resized(size) => {
                                 if let Some(config) = self.window.resize(renderer.config(), *size) {
-                                    app.resize(Vec2::new(
-                                        config.width as f32,
-                                        config.height as f32,
-                                    ));
+                                    app.resize(config.width, config.height);
                                     renderer.configure(config);
                                 }
                             }
@@ -168,10 +167,9 @@ impl Engine {
                     let dt = now - last_render;
                     last_render = now;
 
-                    renderer.request_buffer_update(
-                        camera_binding.id(),
-                        &app.update_and_build_controller(dt),
-                    );
+                    app.update(dt);
+
+                    renderer.request_buffer_update(camera_binding.id(), &app.uniform_data());
 
                     let (k, o) = scene.step_sim(dt.as_secs_f64() / 12.0);
                     renderer.instance_buffer_update(

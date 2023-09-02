@@ -1,4 +1,8 @@
-use super::{object, scene, shader::Shader, uniform::UniformBufferBinding};
+use super::{
+    object, scene,
+    shader::Shader,
+    uniform::{ScreenBuffer, UniformBuffer, UniformBufferBinding},
+};
 use anyhow::{anyhow, Context, Ok, Result};
 use slotmap::SecondaryMap;
 use std::{
@@ -17,6 +21,8 @@ pub struct Renderer {
     // Using a boxed slice over a Vec because I don't want mutability
     buffer_update: VecDeque<(usize, Box<[u8]>)>,
     instance_data: SecondaryMap<object::EngineKey, Box<[u8]>>,
+
+    screen_binding: UniformBufferBinding,
 }
 
 impl Renderer {
@@ -27,6 +33,11 @@ impl Renderer {
         config: wgpu::SurfaceConfiguration,
     ) -> Self {
         surface.configure(&device, &config);
+
+        let screen_binding = ScreenBuffer::new().bind(
+            bytemuck::cast_slice(&[config.width as f32, config.height as f32]),
+            &device,
+        );
 
         Self {
             surface,
@@ -39,6 +50,7 @@ impl Renderer {
             shaders: HashMap::default(),
             buffer_update: VecDeque::default(),
             instance_data: SecondaryMap::default(),
+            screen_binding,
         }
     }
 
@@ -89,6 +101,16 @@ impl Renderer {
                 );
 
                 buffer.copy_from_slice(v.1.as_ref());
+            } else if v.0 == self.screen_binding.id() {
+                let mut buffer = self.staging_belt.write_buffer(
+                    &mut encoder,
+                    self.screen_binding.buffer(),
+                    0x0,
+                    BufferSize::new(self.screen_binding.len()).unwrap(),
+                    &self.device,
+                );
+
+                buffer.copy_from_slice(v.1.as_ref());
             }
         }
 
@@ -119,6 +141,7 @@ impl Renderer {
 
         pass.set_pipeline(pipeline);
         pass.set_bind_group(0, camera_buffer.bind_group(), &[]);
+        pass.set_bind_group(1, self.screen_binding.bind_group(), &[]);
 
         for (_key, value) in scene.objects() {
             let odc = value.odc();
@@ -151,6 +174,13 @@ impl Renderer {
     }
 
     pub fn configure(&mut self, new_config: wgpu::SurfaceConfiguration) {
+        if new_config.width != self.config.width || new_config.height != self.config.height {
+            self.request_buffer_update(
+                self.screen_binding.id(),
+                bytemuck::cast_slice(&[new_config.width as f32, new_config.height as f32]),
+            )
+        }
+
         self.config = new_config;
         self.surface.configure(&self.device, &self.config);
     }
@@ -161,6 +191,10 @@ impl Renderer {
 
     pub fn device(&self) -> &wgpu::Device {
         &self.device
+    }
+
+    pub fn screen_binding(&self) -> &UniformBufferBinding {
+        &self.screen_binding
     }
 }
 

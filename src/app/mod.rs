@@ -1,35 +1,59 @@
-use self::controller::CameraController2D;
-use crate::engine::cam::Camera2D;
-use glam::Vec2;
+use self::controller::CameraController;
+use crate::engine::cam::{Camera3D, Projection};
 use std::time::Duration;
-use winit::event::WindowEvent;
+use winit::event::{KeyboardInput, WindowEvent};
 
 pub struct App {
-    camera: Camera2D,
-    camera_controller: CameraController2D,
+    camera: Camera3D,
+    projection: Projection,
+    camera_controller: CameraController,
 }
 
 impl App {
-    pub fn new(screen: Vec2) -> Self {
+    pub fn new(width: u32, height: u32) -> Self {
         Self {
-            camera: Camera2D::new(100.0, 0.0, Vec2::ZERO, screen),
-            camera_controller: CameraController2D::default(),
+            camera: Camera3D::new(
+                (0.0, 0.0, 0.0),
+                (0.0_f32).to_radians(),
+                (0.0_f32).to_radians(),
+            ),
+            projection: Projection::new(width, height, (45.0_f32).to_radians(), 0.1, 100.0),
+            camera_controller: CameraController::new(4.0, 0.4),
         }
     }
 
-    pub fn resize(&mut self, size: Vec2) {
-        self.camera.screen_size = size;
+    pub fn resize(&mut self, width: u32, height: u32) {
+        self.projection.resize(width, height)
     }
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
-        self.camera_controller.input(event)
+        match event {
+            WindowEvent::KeyboardInput {
+                input:
+                    KeyboardInput {
+                        virtual_keycode: Some(key),
+                        state,
+                        ..
+                    },
+                ..
+            } => self.camera_controller.process_keyboard(*key, *state),
+            WindowEvent::MouseWheel { delta, .. } => {
+                self.camera_controller.process_scroll(delta);
+                true
+            }
+            _ => false,
+        }
     }
 
-    pub fn update_and_build_controller(&mut self, dt: Duration) -> Vec<u8> {
-        self.camera_controller.update(&mut self.camera, dt)
+    pub fn update(&mut self, dt: Duration) {
+        self.camera_controller.update_camera(&mut self.camera, dt);
     }
 
-    pub fn camera(&self) -> &Camera2D {
+    pub fn uniform_data(&self) -> Vec<u8> {
+        bytemuck::cast_slice(&[self.projection.mat() * self.camera.mat()]).to_vec()
+    }
+
+    pub fn camera(&self) -> &Camera3D {
         &self.camera
     }
 }
